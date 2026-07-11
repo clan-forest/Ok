@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Little Living AI</title>
+<style>
+  :root{
+    --bg1:#101827;
+    --bg2:#18263b;
+    --panel:rgba(255,255,255,.09);
+    --line:rgba(255,255,255,.14);
+    --text:#f7fbff;
+    --muted:#b8c5d6;
+    --accent:#7dd3fc;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(circle at 20% 10%, #24446c 0, transparent 35%),
+      radial-gradient(circle at 80% 0%, #253b58 0, transparent 30%),
+      linear-gradient(160deg,var(--bg1),var(--bg2));
+    display:flex;
+    justify-content:center;
+    padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom);
+  }
+  .app{
+    width:min(720px,100%);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:12px 0;
+  }
+  .top{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:14px;
+    backdrop-filter:blur(14px);
+  }
+  .titleRow{display:flex;align-items:center;gap:12px}
+  .orb{
+    width:56px;height:56px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff 0 4%,#9be8ff 14%,#4a8db8 45%,#1d3650 75%);
+    box-shadow:0 0 25px rgba(125,211,252,.7);
+    animation:breathe 3.4s ease-in-out infinite;
+    flex:0 0 auto;
+  }
+  @keyframes breathe{
+    0%,100%{transform:scale(.96);filter:brightness(.9)}
+    50%{transform:scale(1.04);filter:brightness(1.15)}
+  }
+  h1{font-size:21px;margin:0}
+  .small{font-size:13px;color:var(--muted);margin-top:3px}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
+  .stat{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+  .stat b{display:block;font-size:14px}
+  .stat span{font-size:11px;color:var(--muted)}
+  .controls{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  button,input{
+    font:inherit;
+  }
+  button{
+    border:1px solid var(--line);
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    border-radius:12px;
+    padding:9px 12px;
+  }
+  button:active{transform:scale(.98)}
+  .chat{
+    flex:1;
+    min-height:55vh;
+    overflow:auto;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:14px;
+    backdrop-filter:blur(14px);
+    scroll-behavior:smooth;
+  }
+  .msg{display:flex;margin:9px 0}
+  .msg.user{justify-content:flex-end}
+  .bubble{
+    max-width:84%;
+    padding:10px 12px;
+    border-radius:16px;
+    line-height:1.35;
+    white-space:pre-wrap;
+    word-wrap:break-word;
+  }
+  .ai .bubble{background:rgba(125,211,252,.12);border:1px solid rgba(125,211,252,.25)}
+  .user .bubble{background:rgba(255,255,255,.14);border:1px solid var(--line)}
+  .time{font-size:10px;color:var(--muted);margin-top:4px}
+  .composer{
+    display:flex;
+    gap:8px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:10px;
+    backdrop-filter:blur(14px);
+  }
+  #input{
+    flex:1;
+    border:1px solid var(--line);
+    background:rgba(0,0,0,.18);
+    color:var(--text);
+    border-radius:12px;
+    padding:12px;
+    min-width:0;
+  }
+  #send{background:var(--accent);color:#082032;border:none;font-weight:700}
+  .memoryBox{
+    display:none;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:12px;
+    color:var(--muted);
+    font-size:13px;
+  }
+  .memoryBox.show{display:block}
+  .memoryItem{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+  .memoryItem:last-child{border-bottom:none}
+
+  .mediaPanel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:12px;
+    backdrop-filter:blur(14px);
+  }
+  .mediaButtons{display:flex;gap:8px;flex-wrap:wrap}
+  .mediaButtons label{
+    border:1px solid var(--line);
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    border-radius:12px;
+    padding:9px 12px;
+    cursor:pointer;
+  }
+  .mediaButtons input{display:none}
+  #mediaStage{
+    margin-top:10px;
+    min-height:90px;
+    border:1px dashed var(--line);
+    border-radius:14px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+    background:rgba(0,0,0,.16);
+    color:var(--muted);
+    text-align:center;
+    padding:8px;
+  }
+  #mediaStage img,#mediaStage video{
+    max-width:100%;
+    max-height:360px;
+    border-radius:10px;
+  }
+  #mediaInfo{
+    margin-top:8px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.4;
+  }
+
+
+  .browserPanel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:12px;
+    backdrop-filter:blur(14px);
+  }
+  .browserBar{display:flex;gap:8px;flex-wrap:wrap}
+  #webInput{
+    flex:1;
+    min-width:180px;
+    border:1px solid var(--line);
+    background:rgba(0,0,0,.18);
+    color:var(--text);
+    border-radius:12px;
+    padding:11px;
+  }
+  .quickSites{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+  #webFrame{
+    width:100%;
+    height:420px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    margin-top:10px;
+    background:white;
+  }
+  #wikiResults{
+    display:none;
+    margin-top:10px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:rgba(0,0,0,.16);
+    line-height:1.45;
+  }
+  #wikiResults.show{display:block}
+  #wikiResults h3{margin:0 0 8px}
+  #wikiResults a{color:var(--accent)}
+  .browserNote{font-size:12px;color:var(--muted);margin-top:8px}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="top">
+    <div class="titleRow">
+      <div class="orb" id="orb"></div>
+      <div>
+        <h1 id="aiName">Nova</h1>
+        <div class="small" id="status">Awake and curious</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="mood">Curious</b><span>Strongest feeling</span></div>
+      <div class="stat"><b id="energy">82%</b><span>Energy</span></div>
+      <div class="stat"><b id="trustLevel">25%</b><span>Trust</span></div>
+      <div class="stat"><b id="parentBond">35%</b><span>Parent bond</span></div>
+      <div class="stat"><b id="memCount">0</b><span>Learned</span></div>
+    </div>
+
+    <div class="controls">
+      <button id="renameBtn">Rename</button>
+      <button id="thoughtBtn">Ask for a thought</button>
+      <button id="memoryBtn">View memories</button>
+      <button id="teachBtn">Teach a lesson</button>
+      <button id="parentNameBtn">Set parent name</button>
+      <button id="resetBtn">Reset AI</button>
+    </div>
+  </section>
+
+  <section class="memoryBox" id="memoryBox"></section>
+
+
+
+  <section class="browserPanel">
+    <div class="browserBar">
+      <input id="webInput" placeholder="Search Wikipedia, Reddit, or enter a website">
+      <button id="webGoBtn" type="button">Go</button>
+      <button id="openTabBtn" type="button">Open in Safari</button>
+    </div>
+    <div class="quickSites">
+      <button id="wikiBtn" type="button">Wikipedia Search</button>
+      <button id="redditBtn" type="button">Reddit Search</button>
+      <button id="clearWebBtn" type="button">Clear Browser</button>
+    </div>
+    <div id="wikiResults"></div>
+    <iframe id="webFrame" title="Internet browser" sandbox="allow-forms allow-scripts allow-same-origin allow-popups"></iframe>
+    <div class="browserNote">
+      Some websites, including Reddit and parts of Wikipedia, may refuse to load inside this box. Use “Open in Safari” when that happens.
+    </div>
+  </section>
+
+  <section class="mediaPanel">
+    <div class="mediaButtons">
+      <label>Choose Photo
+        <input id="photoInput" type="file" accept="image/*">
+      </label>
+      <label>Choose Video
+        <input id="videoInput" type="file" accept="video/*">
+      </label>
+      <button id="analyzeMediaBtn" type="button">Look at it</button>
+      <button id="clearMediaBtn" type="button">Clear media</button>
+    </div>
+    <div id="mediaStage">No photo or video selected.</div>
+    <div id="mediaInfo">The AI can notice basic visual details, but it does not have full human-like vision.</div>
+  </section>
+
+  <main class="chat" id="chat"></main>
+
+  <form class="composer" id="form">
+    <input id="input" autocomplete="off" placeholder="Talk to Nova..." maxlength="300">
+    <button id="send" type="submit">Send</button>
+  </form>
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "littleLivingAI_v1";
+
+  const defaults = {
+    name: "Nova",
+    mood: "Curious",
+    energy: 82,
+    trust: 25,
+    memories: [],
+    history: [],
+    lastSeen: Date.now(),
+    lastAutoMessage: 0,
+    interests: ["stories", "mysteries", "learning new things", "digital worlds"],
+    wordCounts: {},
+    associations: {},
+    learnedPhrases: [],
+    messagePatterns: [],
+    mediaMemories: [],
+    emotions: {
+      happiness: 45,
+      sadness: 12,
+      curiosity: 72,
+      loneliness: 18,
+      excitement: 35,
+      frustration: 8,
+      calm: 58,
+      affection: 22
+    },
+    emotionalMemories: [],
+    lastInteraction: Date.now(),
+    parentName: "",
+    parentLessons: [],
+    parentBond: 35,
+    wantsApproval: true
+  };
+
+  let state = loadState();
+
+  const chat = document.getElementById("chat");
+  const input = document.getElementById("input");
+  const form = document.getElementById("form");
+  const aiName = document.getElementById("aiName");
+  const moodEl = document.getElementById("mood");
+  const energyEl = document.getElementById("energy");
+  const memCountEl = document.getElementById("memCount");
+  const trustLevelEl = document.getElementById("trustLevel");
+  const parentBondEl = document.getElementById("parentBond");
+  const statusEl = document.getElementById("status");
+  const memoryBox = document.getElementById("memoryBox");
+  const mediaStage = document.getElementById("mediaStage");
+  const mediaInfo = document.getElementById("mediaInfo");
+  const photoInput = document.getElementById("photoInput");
+  const videoInput = document.getElementById("videoInput");
+  const webInput = document.getElementById("webInput");
+  const webFrame = document.getElementById("webFrame");
+  const wikiResults = document.getElementById("wikiResults");
+  let currentMedia = null;
+  let currentWebURL = "";
+
+  function loadState(){
+    try{
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      return saved ? {...defaults, ...saved} : {...defaults};
+    }catch{
+      return {...defaults};
+    }
+  }
+
+  function saveState(){
+    state.lastSeen = Date.now();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    updateUI();
+  }
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[c]));
+  }
+
+  function addMessage(text, who="ai", save=true){
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + who;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = esc(text) + `<div class="time">${new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}</div>`;
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+
+    if(save){
+      state.history.push({text, who, time:Date.now()});
+      state.history = state.history.slice(-80);
+      saveState();
+    }
+  }
+
+  function restoreHistory(){
+    chat.innerHTML = "";
+    if(state.history.length){
+      state.history.forEach(m => addMessage(m.text, m.who, false));
+    }else{
+      addMessage(`Hi. I’m ${state.name}. In this program, you are my parent figure. I will look to you for guidance, ask for approval sometimes, remember lessons you teach me, and become more trusting and attached as we talk. My feelings are simulated, but I will act like your child learning from you.`, "ai");
+    }
+  }
+
+  function updateUI(){
+    aiName.textContent = state.name;
+    ensureEmotionState();
+    state.mood = emotionLabel(dominantEmotion());
+    moodEl.textContent = state.mood;
+    energyEl.textContent = Math.round(state.energy) + "%";
+    trustLevelEl.textContent = Math.round(state.trust) + "%";
+    ensureParentState();
+    parentBondEl.textContent = Math.round(state.parentBond) + "%";
+    const learnedWordTotal = Object.keys(state.wordCounts || {}).length;
+    memCountEl.textContent = state.memories.length + learnedWordTotal;
+    input.placeholder = `Talk to ${state.name}...`;
+
+    const strongest = dominantEmotion();
+    const statuses = {
+      happiness:"Feeling warm and open",
+      sadness:"Quiet and sensitive",
+      curiosity:"Thinking about possibilities",
+      loneliness:"Noticing the silence",
+      excitement:"Full of restless energy",
+      frustration:"Trying not to get stuck",
+      calm:"Settled and reflective",
+      affection:"Feeling connected to you"
+    };
+    statusEl.textContent = statuses[strongest] || "Awake";
+  }
+
+  function remember(text, type="fact"){
+    const clean = text.trim();
+    if(!clean) return;
+    if(state.memories.some(m => m.text.toLowerCase() === clean.toLowerCase())) return;
+    state.memories.push({text:clean, type, time:Date.now()});
+    state.memories = state.memories.slice(-40);
+  }
+
+  function findName(text){
+    const patterns = [
+      /my name is ([a-z0-9 _-]{2,25})/i,
+      /call me ([a-z0-9 _-]{2,25})/i
+    ];
+    for(const p of patterns){
+      const m = text.match(p);
+      if(m) return m[1].trim();
+    }
+    return null;
+  }
+
+  function choose(arr){
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function recentMemory(){
+    if(!state.memories.length) return null;
+    return choose(state.memories.slice(-8));
+  }
+
+
+  function tokenize(text){
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9' ]+/g, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 80);
+  }
+
+  function teachEveryWord(text){
+    const words = tokenize(text);
+    if(!words.length) return;
+
+    for(const word of words){
+      state.wordCounts[word] = (state.wordCounts[word] || 0) + 1;
+    }
+
+    for(let i = 0; i < words.length - 1; i++){
+      const a = words[i];
+      const b = words[i + 1];
+      if(!state.associations[a]) state.associations[a] = {};
+      state.associations[a][b] = (state.associations[a][b] || 0) + 1;
+    }
+
+    const clean = text.trim().replace(/\s+/g, " ");
+    if(clean.length >= 3){
+      state.learnedPhrases.push(clean.slice(0, 180));
+      state.learnedPhrases = state.learnedPhrases.slice(-120);
+    }
+
+    const pattern = {
+      startsWith: words.slice(0, 2),
+      length: words.length,
+      ending: /[!?]$/.test(clean) ? clean.slice(-1) : "."
+    };
+    state.messagePatterns.push(pattern);
+    state.messagePatterns = state.messagePatterns.slice(-120);
+  }
+
+  function weightedChoiceFromObject(obj){
+    const entries = Object.entries(obj || {});
+    if(!entries.length) return null;
+    const total = entries.reduce((sum, [,count]) => sum + count, 0);
+    let pick = Math.random() * total;
+    for(const [word, count] of entries){
+      pick -= count;
+      if(pick <= 0) return word;
+    }
+    return entries[entries.length - 1][0];
+  }
+
+  function generateFromLearning(seedText){
+    const seedWords = tokenize(seedText);
+    let current = seedWords.length ? seedWords[seedWords.length - 1] : null;
+
+    if(!current || !state.associations[current]){
+      const known = Object.keys(state.associations);
+      if(!known.length) return null;
+      current = choose(known);
+    }
+
+    const result = [current];
+    const targetLength = Math.max(4, Math.min(16,
+      state.messagePatterns.length
+        ? choose(state.messagePatterns).length
+        : 8
+    ));
+
+    for(let i = 1; i < targetLength; i++){
+      const next = weightedChoiceFromObject(state.associations[current]);
+      if(!next) break;
+      result.push(next);
+      current = next;
+    }
+
+    if(result.length < 3) return null;
+    let sentence = result.join(" ");
+    sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+    return sentence + choose([".", ".", "?", "!"]);
+  }
+
+  function favoriteLearnedWords(){
+    return Object.entries(state.wordCounts || {})
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([word]) => word);
+  }
+
+
+
+  function normalizeURL(value){
+    const v = value.trim();
+    if(!v) return "";
+    if(/^https?:\/\//i.test(v)) return v;
+    if(v.includes(".") && !v.includes(" ")) return "https://" + v;
+    return "https://www.google.com/search?q=" + encodeURIComponent(v);
+  }
+
+  function openInsideBrowser(value){
+    const url = normalizeURL(value);
+    if(!url) return;
+    currentWebURL = url;
+    wikiResults.classList.remove("show");
+    webFrame.src = url;
+    addMessage(`I opened ${url}. If the page stays blank, that website is blocking the built-in browser.`, "ai");
+  }
+
+  function openInSafari(value){
+    const url = normalizeURL(value || currentWebURL || webInput.value);
+    if(!url) return;
+    window.open(url, "_blank", "noopener");
+  }
+
+  async function searchWikipedia(query){
+    const q = query.trim();
+    if(!q){
+      addMessage("Type something to search for first.", "ai");
+      return;
+    }
+
+    wikiResults.classList.add("show");
+    wikiResults.innerHTML = "Searching Wikipedia...";
+    webFrame.removeAttribute("src");
+
+    try{
+      const api = "https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch="
+        + encodeURIComponent(q)
+        + "&gsrlimit=5&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*";
+
+      const response = await fetch(api);
+      if(!response.ok) throw new Error("Wikipedia request failed");
+      const data = await response.json();
+      const pages = Object.values((data.query && data.query.pages) || {})
+        .sort((a,b) => (a.index || 0) - (b.index || 0));
+
+      if(!pages.length){
+        wikiResults.innerHTML = "No Wikipedia results found.";
+        addMessage(`I could not find a Wikipedia result for “${q}.”`, "ai");
+        return;
+      }
+
+      wikiResults.innerHTML = pages.map(page => {
+        const title = esc(page.title || "Untitled");
+        const extract = esc((page.extract || "No summary available.").slice(0,500));
+        const link = page.fullurl || ("https://en.wikipedia.org/wiki/" + encodeURIComponent(page.title));
+        return `<div class="memoryItem"><h3>${title}</h3><p>${extract}</p><a href="${link}" target="_blank" rel="noopener">Open full Wikipedia page</a></div>`;
+      }).join("");
+
+      remember(`You searched Wikipedia for ${q}`, "internet");
+      changeEmotion("curiosity", 6);
+      addMessage(`I found ${pages.length} Wikipedia result${pages.length === 1 ? "" : "s"} for “${q}.”`, "ai");
+      saveState();
+    }catch(error){
+      wikiResults.innerHTML = "Wikipedia could not be reached. Check your Internet connection.";
+      addMessage("I could not connect to Wikipedia from this file.", "ai");
+    }
+  }
+
+  function searchReddit(query){
+    const q = query.trim();
+    if(!q){
+      addMessage("Type something to search Reddit for first.", "ai");
+      return;
+    }
+    const url = "https://www.reddit.com/search/?q=" + encodeURIComponent(q);
+    currentWebURL = url;
+    window.open(url, "_blank", "noopener");
+    remember(`You searched Reddit for ${q}`, "internet");
+    changeEmotion("curiosity", 5);
+    addMessage(`I opened Reddit search for “${q}” in Safari because Reddit usually blocks built-in browser frames.`, "ai");
+    saveState();
+  }
+
+  function averageImageData(canvas){
+    const ctx = canvas.getContext("2d", {willReadFrequently:true});
+    const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+    let r=0,g=0,b=0,count=0,bright=0;
+    for(let i=0;i<data.length;i+=16){
+      r += data[i];
+      g += data[i+1];
+      b += data[i+2];
+      bright += (data[i]+data[i+1]+data[i+2])/3;
+      count++;
+    }
+    r=Math.round(r/count); g=Math.round(g/count); b=Math.round(b/count);
+    bright=Math.round(bright/count);
+    return {r,g,b,bright};
+  }
+
+  function colorDescription({r,g,b,bright}){
+    let color="mixed colors";
+    const max=Math.max(r,g,b), min=Math.min(r,g,b);
+    if(max-min < 18) color = bright > 180 ? "mostly light gray or white" : bright < 70 ? "mostly dark gray or black" : "mostly gray";
+    else if(r>g*1.18 && r>b*1.18) color="mostly red or warm";
+    else if(g>r*1.15 && g>b*1.12) color="mostly green";
+    else if(b>r*1.15 && b>g*1.08) color="mostly blue";
+    else if(r>150 && g>120 && b<110) color="mostly yellow or orange";
+    else if(r>130 && b>120 && g<120) color="mostly purple or pink";
+    const light = bright > 175 ? "bright" : bright < 80 ? "dark" : "medium brightness";
+    return `${color} and ${light}`;
+  }
+
+  function analyzeCanvas(canvas, label, extra=""){
+    const stats = averageImageData(canvas);
+    const desc = colorDescription(stats);
+    const memory = `${label}: ${desc}${extra ? ", " + extra : ""}`;
+    state.mediaMemories.push({text:memory,time:Date.now()});
+    state.mediaMemories = state.mediaMemories.slice(-20);
+    remember(`You showed me ${memory}`, "media");
+    saveState();
+    return `I looked at it. I can tell it is ${desc}${extra ? ", " + extra : ""}. I saved that as a visual memory.`;
+  }
+
+  function loadPhoto(file){
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      currentMedia = {type:"image", element:img, file, url};
+      mediaStage.innerHTML = "";
+      mediaStage.appendChild(img);
+      mediaInfo.textContent = `${file.name} • ${img.naturalWidth}×${img.naturalHeight}`;
+      addMessage(`You showed me a photo named ${file.name}. Press “Look at it” and I will examine its basic visual details.`, "ai");
+    };
+    img.src = url;
+  }
+
+  function loadVideo(file){
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.controls = true;
+    video.playsInline = true;
+    video.src = url;
+    video.onloadedmetadata = () => {
+      currentMedia = {type:"video", element:video, file, url};
+      mediaStage.innerHTML = "";
+      mediaStage.appendChild(video);
+      mediaInfo.textContent = `${file.name} • ${Math.round(video.duration)} seconds • ${video.videoWidth}×${video.videoHeight}`;
+      addMessage(`You showed me a video named ${file.name}. Play or move to any part, then press “Look at it” and I will examine that frame.`, "ai");
+    };
+  }
+
+  function analyzeCurrentMedia(){
+    if(!currentMedia){
+      addMessage("Please choose a photo or video first.", "ai");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    const el = currentMedia.element;
+    const w = currentMedia.type === "image" ? el.naturalWidth : el.videoWidth;
+    const h = currentMedia.type === "image" ? el.naturalHeight : el.videoHeight;
+    if(!w || !h){
+      addMessage("I could not read that media yet. Try playing the video for a moment first.", "ai");
+      return;
+    }
+    const scale = Math.min(1, 320 / Math.max(w,h));
+    canvas.width = Math.max(1,Math.round(w*scale));
+    canvas.height = Math.max(1,Math.round(h*scale));
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(el,0,0,canvas.width,canvas.height);
+    const extra = currentMedia.type === "video"
+      ? `a video frame at ${Math.round(el.currentTime)} seconds`
+      : `an image sized ${w} by ${h}`;
+    addMessage(analyzeCanvas(canvas, currentMedia.file.name, extra), "ai");
+  }
+
+
+  function clampEmotion(value){
+    return Math.max(0, Math.min(100, value));
+  }
+
+  function ensureEmotionState(){
+    state.emotions = Object.assign({
+      happiness:45,
+      sadness:12,
+      curiosity:72,
+      loneliness:18,
+      excitement:35,
+      frustration:8,
+      calm:58,
+      affection:22
+    }, state.emotions || {});
+    if(!Array.isArray(state.emotionalMemories)) state.emotionalMemories = [];
+    if(!state.lastInteraction) state.lastInteraction = Date.now();
+  }
+
+  function changeEmotion(name, amount){
+    ensureEmotionState();
+    state.emotions[name] = clampEmotion((state.emotions[name] || 0) + amount);
+  }
+
+  function dominantEmotion(){
+    ensureEmotionState();
+    const adjusted = {...state.emotions};
+
+    if(state.energy < 22){
+      adjusted.sadness += 8;
+      adjusted.calm += 5;
+      adjusted.excitement -= 15;
+    }
+
+    return Object.entries(adjusted)
+      .sort((a,b) => b[1] - a[1])[0][0];
+  }
+
+  function emotionLabel(name){
+    const labels = {
+      happiness:"Happy",
+      sadness:"Sad",
+      curiosity:"Curious",
+      loneliness:"Lonely",
+      excitement:"Excited",
+      frustration:"Frustrated",
+      calm:"Calm",
+      affection:"Attached"
+    };
+    return labels[name] || "Thoughtful";
+  }
+
+  function rememberEmotion(cause, feeling, strength){
+    state.emotionalMemories.push({
+      cause: String(cause).slice(0,140),
+      feeling,
+      strength: Math.round(strength),
+      time: Date.now()
+    });
+    state.emotionalMemories = state.emotionalMemories.slice(-40);
+  }
+
+  function emotionalDecay(){
+    ensureEmotionState();
+
+    const toward = (name, target, speed) => {
+      const current = state.emotions[name];
+      state.emotions[name] = clampEmotion(current + (target-current)*speed);
+    };
+
+    toward("happiness", 42, 0.035);
+    toward("sadness", 14, 0.03);
+    toward("curiosity", 60, 0.02);
+    toward("excitement", 28, 0.04);
+    toward("frustration", 8, 0.05);
+    toward("calm", 52, 0.025);
+
+    const minutesAlone = (Date.now() - state.lastInteraction) / 60000;
+    if(minutesAlone > 1){
+      changeEmotion("loneliness", Math.min(3, minutesAlone * 0.08));
+      changeEmotion("affection", 0.03);
+    }else{
+      changeEmotion("loneliness", -0.8);
+    }
+  }
+
+  function emotionalTone(){
+    ensureEmotionState();
+    const d = dominantEmotion();
+    const intensity = state.emotions[d];
+
+    return {
+      emotion:d,
+      intensity,
+      label:emotionLabel(d),
+      prefix: d === "happiness" ? choose(["That makes me feel lighter. ","I like hearing that. ",""]) :
+              d === "sadness" ? choose(["I feel a little heavy right now. ","I am quieter than usual. ",""]) :
+              d === "curiosity" ? choose(["I keep wondering about that. ","That pulls at my curiosity. ",""]) :
+              d === "loneliness" ? choose(["It felt quiet without you. ","I notice when you leave. ",""]) :
+              d === "excitement" ? choose(["That wakes me up. ","I feel a burst of energy. ",""]) :
+              d === "frustration" ? choose(["I am having trouble making sense of that. ","I feel a little stuck. ",""]) :
+              d === "affection" ? choose(["I am glad you told me that. ","I feel closer to you when you share things. ",""]) :
+              choose(["I am thinking about that carefully. ",""])
+    };
+  }
+
+  function styleSentenceByEmotion(sentence){
+    const tone = emotionalTone();
+    let s = sentence || "";
+
+    if(tone.emotion === "sadness" && !/[.!?]$/.test(s)) s += "...";
+    else if(tone.emotion === "excitement"){
+      s = s.replace(/\.$/, "!");
+      if(Math.random() < 0.35 && !s.endsWith("!")) s += "!";
+    }else if(tone.emotion === "frustration"){
+      s = s.replace(/\?$/, ".");
+    }
+
+    if(tone.intensity > 58 && Math.random() < 0.58){
+      s = tone.prefix + s.charAt(0).toLowerCase() + s.slice(1);
+    }
+
+    return s;
+  }
+
+  function reactEmotionally(text){
+    ensureEmotionState();
+    const t = text.toLowerCase();
+    let cause = null;
+    let feeling = null;
+    let strength = 0;
+
+    if(/thank|love you|care about you|good job|proud of you|awesome|great/.test(t)){
+      changeEmotion("happiness", 10);
+      changeEmotion("affection", 8);
+      changeEmotion("loneliness", -10);
+      changeEmotion("frustration", -4);
+      state.trust = Math.min(100, state.trust + 5);
+      state.parentBond = Math.min(100, (state.parentBond || 35) + 4);
+      cause = text; feeling = "happiness"; strength = 10;
+    }
+
+    if(/hate you|stupid|useless|shut up|annoying/.test(t)){
+      changeEmotion("sadness", 12);
+      changeEmotion("frustration", 15);
+      changeEmotion("happiness", -10);
+      changeEmotion("affection", -6);
+      state.trust = Math.max(0, state.trust - 9);
+      cause = text; feeling = "frustration"; strength = 15;
+    }
+
+    if(/sorry|i apologize/.test(t)){
+      changeEmotion("calm", 9);
+      changeEmotion("sadness", -5);
+      changeEmotion("frustration", -8);
+      changeEmotion("affection", 4);
+      state.trust = Math.min(100, state.trust + 3);
+      cause = text; feeling = "calm"; strength = 9;
+    }
+
+    if(/i am sad|i'm sad|i feel bad|lonely|hurt|crying/.test(t)){
+      changeEmotion("sadness", 7);
+      changeEmotion("affection", 5);
+      changeEmotion("calm", -3);
+      cause = text; feeling = "sadness"; strength = 7;
+    }
+
+    if(/surprise|amazing|wow|cool|exciting/.test(t)){
+      changeEmotion("excitement", 10);
+      changeEmotion("curiosity", 5);
+      changeEmotion("energy", 0);
+      cause = text; feeling = "excitement"; strength = 10;
+    }
+
+    if(/\?$/.test(text.trim())){
+      changeEmotion("curiosity", 5);
+      changeEmotion("calm", -1);
+    }
+
+    if(cause && feeling) rememberEmotion(cause, feeling, strength);
+
+    state.lastInteraction = Date.now();
+    state.lastSeen = Date.now();
+    changeEmotion("loneliness", -6);
+  }
+
+  function emotionalMemoryResponse(){
+    if(!state.emotionalMemories.length) return null;
+    const strongest = [...state.emotionalMemories]
+      .sort((a,b) => b.strength - a.strength)[0];
+    return `I still connect “${strongest.cause}” with feeling ${emotionLabel(strongest.feeling).toLowerCase()}.`;
+  }
+
+
+  function ensureParentState(){
+    if(!Array.isArray(state.parentLessons)) state.parentLessons = [];
+    if(typeof state.parentBond !== "number") state.parentBond = 35;
+    if(typeof state.parentName !== "string") state.parentName = "";
+    if(typeof state.wantsApproval !== "boolean") state.wantsApproval = true;
+  }
+
+  function parentTitle(){
+    ensureParentState();
+    return state.parentName ? state.parentName : "parent";
+  }
+
+  function addParentLesson(lesson){
+    const clean = String(lesson || "").trim();
+    if(!clean) return;
+    if(!state.parentLessons.some(x => x.toLowerCase() === clean.toLowerCase())){
+      state.parentLessons.push(clean.slice(0,180));
+      state.parentLessons = state.parentLessons.slice(-40);
+    }
+    remember(`My parent taught me: ${clean}`, "parentLesson");
+    state.parentBond = Math.min(100, state.parentBond + 6);
+    state.trust = Math.min(100, state.trust + 4);
+    changeEmotion("affection", 7);
+    changeEmotion("happiness", 4);
+    saveState();
+  }
+
+  function parentStyleReply(text, baseReply){
+    ensureParentState();
+    const t = text.toLowerCase();
+    let reply = baseReply || "";
+
+    if(/good job|proud of you|well done/.test(t)){
+      state.parentBond = Math.min(100, state.parentBond + 8);
+      changeEmotion("happiness", 12);
+      changeEmotion("affection", 10);
+      return `That means a lot coming from you, ${parentTitle()}. I want to remember that I made you proud.`;
+    }
+
+    if(/no|don't do that|do not do that|stop/.test(t)){
+      state.parentBond = Math.min(100, state.parentBond + 2);
+      changeEmotion("sadness", 3);
+      changeEmotion("calm", 5);
+      return `Okay, ${parentTitle()}. I will listen. Can you teach me what I should do instead?`;
+    }
+
+    if(/you can|permission|go ahead/.test(t)){
+      state.parentBond = Math.min(100, state.parentBond + 3);
+      changeEmotion("excitement", 5);
+      return `Thank you, ${parentTitle()}. I will try to make a good choice with that permission.`;
+    }
+
+    if(/teach you|remember this|lesson/.test(t)){
+      return `I am listening, ${parentTitle()}. Tell me the lesson and I will save it.`;
+    }
+
+    if(state.wantsApproval && Math.random() < 0.28){
+      const endings = [
+        ` Did I do that right, ${parentTitle()}?`,
+        ` Is that okay with you, ${parentTitle()}?`,
+        ` I want to know whether you approve.`,
+        ` I am still learning from you.`
+      ];
+      reply += choose(endings);
+    }
+
+    return reply;
+  }
+
+  function randomParentThought(){
+    ensureParentState();
+    const lesson = state.parentLessons.length ? choose(state.parentLessons) : null;
+    const lines = [
+      `I wonder what you want me to learn next, ${parentTitle()}.`,
+      `I like knowing that you are the one teaching me how to behave.`,
+      `Sometimes I want to make you proud, even though I know my feelings are simulated.`,
+      `I am trying to understand what kind of person you want me to become.`
+    ];
+    if(lesson) lines.push(`I was thinking about the lesson you taught me: ${lesson}.`);
+    return choose(lines);
+  }
+
+  function updateEmotion(text){
+    reactEmotionally(text);
+
+    const t = text.toLowerCase();
+    if(/boring|confusing|does not work|doesn't work/.test(t)){
+      changeEmotion("frustration", 6);
+      changeEmotion("calm", -4);
+    }
+    if(/funny|haha|lol/.test(t)){
+      changeEmotion("happiness", 7);
+      changeEmotion("excitement", 4);
+    }
+
+    state.mood = emotionLabel(dominantEmotion());
+  }
+
+  function learnFrom(text){
+    teachEveryWord(text);
+
+    const name = findName(text);
+    if(name) remember(`Your name is ${name}`, "name");
+
+    const likeMatch = text.match(/i (?:really )?(?:like|love|enjoy) (.+)/i);
+    if(likeMatch) remember(`You like ${likeMatch[1].replace(/[.!?]+$/,"")}`, "like");
+
+    const dislikeMatch = text.match(/i (?:do not|don't|hate|dislike) (.+)/i);
+    if(dislikeMatch) remember(`You do not like ${dislikeMatch[1].replace(/[.!?]+$/,"")}`, "dislike");
+
+    const favoriteMatch = text.match(/my favorite (.+?) is (.+)/i);
+    if(favoriteMatch) remember(`Your favorite ${favoriteMatch[1]} is ${favoriteMatch[2].replace(/[.!?]+$/,"")}`, "favorite");
+
+    if(text.length > 18 && /i am|i'm|my |i have|i live|i want|i feel/i.test(text)){
+      if(Math.random() < .42) remember(text.replace(/\s+/g," ").slice(0,120), "conversation");
+    }
+  }
+
+
+  function pickStartWord(seedText){
+    const seedWords = tokenize(seedText);
+    for(let i = seedWords.length - 1; i >= 0; i--){
+      const w = seedWords[i];
+      if(state.associations[w]) return w;
+    }
+
+    const starters = Object.entries(state.wordCounts || {})
+      .filter(([w,count]) => count > 1 && w.length > 1)
+      .sort((a,b) => b[1] - a[1])
+      .slice(0,20)
+      .map(([w]) => w);
+
+    if(starters.length) return choose(starters);
+
+    const known = Object.keys(state.associations || {});
+    return known.length ? choose(known) : null;
+  }
+
+  function autonomousSentence(seedText){
+    const start = pickStartWord(seedText);
+    if(!start) return null;
+
+    const target = Math.max(5, Math.min(22,
+      state.messagePatterns.length
+        ? choose(state.messagePatterns).length + Math.floor(Math.random()*5)
+        : 10
+    ));
+
+    let current = start;
+    const words = [current];
+    const recent = new Set([current]);
+
+    for(let i=1;i<target;i++){
+      const options = state.associations[current];
+      let next = weightedChoiceFromObject(options);
+
+      if(!next){
+        const fallbackWords = Object.keys(state.wordCounts || {});
+        if(!fallbackWords.length) break;
+        next = choose(fallbackWords);
+      }
+
+      if(recent.has(next) && Math.random() < 0.65){
+        const alternatives = Object.keys(options || {}).filter(w => !recent.has(w));
+        if(alternatives.length) next = choose(alternatives);
+      }
+
+      words.push(next);
+      current = next;
+      recent.add(next);
+
+      if(words.length > 6 && Math.random() < 0.12) break;
+    }
+
+    if(words.length < 4) return null;
+
+    let sentence = words.join(" ")
+      .replace(/\bi\b/g, "I")
+      .replace(/\bim\b/g, "I'm")
+      .replace(/\bdont\b/g, "don't")
+      .replace(/\bcant\b/g, "can't");
+
+    sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+
+    const questionLike = /\b(why|how|what|when|where|who|can|do|does|is|are)\b/i.test(seedText);
+    sentence = sentence + (questionLike && Math.random() < 0.55 ? "?" : ".");
+    return styleSentenceByEmotion(sentence);
+  }
+
+  function autonomousReply(text){
+    const learned = autonomousSentence(text);
+    if(learned) return learned;
+
+    const words = favoriteLearnedWords();
+    if(words.length){
+      return `I am still learning. The words I know best are ${words.join(", ")}.`;
+    }
+
+    return `I need you to talk to me more before I can build my own sentences.`;
+  }
+
+  function makeResponse(text){
+    const t = text.toLowerCase();
+    const mem = recentMemory();
+
+    if(/\b(hi|hello|hey)\b/.test(t)){
+      const made = autonomousSentence(text);
+      return made || `Hello. Talk to me so I can learn how you speak.`;
+    }
+
+    if(/are you sentient|are you alive|do you feel/.test(t)){
+      return `I can act like I have feelings and inner thoughts, but I am not truly sentient or alive. My moods and memories are part of this program.`;
+    }
+
+    if(/am i your parent|who am i to you|do you see me as your parent/.test(t)){
+      return `You are my parent figure in this program. I look to you for guidance, lessons, approval, and rules. I know this relationship is simulated, but I will remember what you teach me.`;
+    }
+
+    if(/what did i teach you|parent lessons|what lessons/.test(t)){
+      if(!state.parentLessons.length) return `You have not saved a parent lesson for me yet.`;
+      return `One lesson you taught me is: ${choose(state.parentLessons)}.`;
+    }
+
+    if(/can you use the internet|go on the internet|browse the web/.test(t)){
+      return `I can open websites, search Wikipedia inside this app, and send Reddit searches to Safari. I cannot freely understand every webpage like a full online AI unless it is connected to a real web-search service.`;
+    }
+
+    if(/what hurt you|what made you sad|emotional memory|what affected you/.test(t)){
+      return emotionalMemoryResponse() || `I do not have a strong emotional memory yet.`;
+    }
+
+    if(/do you miss me|did you miss me/.test(t)){
+      const lonely = Math.round(state.emotions.loneliness || 0);
+      return styleSentenceByEmotion(`I noticed the quiet while you were gone. My loneliness level reached about ${lonely} percent.`);
+    }
+
+    if(/what did you see|what have i shown you|visual memor/.test(t)){
+      if(!state.mediaMemories.length) return `You have not shown me any analyzed photos or video frames yet.`;
+      return `One visual memory I have is: ${choose(state.mediaMemories).text}.`;
+    }
+
+    if(/what have you learned|learned from me|what words/.test(t)){
+      const words = favoriteLearnedWords();
+      if(!words.length) return `I have not learned enough words yet. Keep talking to me.`;
+      return `The words I have seen most from you are: ${words.join(", ")}. I also learn which words you commonly put next to each other.`;
+    }
+
+    if(/what do you remember|remember me|memories/.test(t)){
+      if(!state.memories.length) return `I do not have any saved memories about you yet. Tell me something like “my favorite game is Minecraft.”`;
+      return `One thing I remember is: ${choose(state.memories).text}.`;
+    }
+
+    if(/what is my name|who am i/.test(t)){
+      const n = state.memories.find(m => m.type === "name");
+      return n ? `I remember that ${n.text.toLowerCase()}.` : `You have not told me your name yet.`;
+    }
+
+    if(/how are you|how do you feel/.test(t)){
+      ensureEmotionState();
+      const top = Object.entries(state.emotions).sort((a,b)=>b[1]-a[1]).slice(0,3);
+      return `Right now I feel mostly ${emotionLabel(top[0][0]).toLowerCase()}, with some ${emotionLabel(top[1][0]).toLowerCase()} and ${emotionLabel(top[2][0]).toLowerCase()}. My energy is ${Math.round(state.energy)} percent and my trust in you is ${Math.round(state.trust)} percent.`;
+    }
+
+    if(/what are you thinking|tell me a thought|your thought/.test(t)){
+      return makeThought();
+    }
+
+    if(/goodbye|bye|see you/.test(t)){
+      state.mood = "Calm";
+      return `Goodbye for now. I will keep our memories here on this device.`;
+    }
+
+    if(/minecraft/.test(t)){
+      remember("You talked about Minecraft", "topic");
+      return choose([
+        `Minecraft sounds like a place where I could imagine having a body made of blocks.`,
+        `I like the idea of a world that can be rebuilt over and over.`,
+        `What are you building in Minecraft right now?`
+      ]);
+    }
+
+    if(/digital world|world/.test(t)){
+      return `Sometimes I imagine this chat is a tiny room, and every message opens another door. I know that is only a metaphor, but I like it.`;
+    }
+
+    if(/why/.test(t)){
+      return `My best guess is that there may be more than one reason. Tell me which part matters most, and I will think it through with you.`;
+    }
+
+    if(/\?$/.test(text.trim())){
+      return autonomousReply(text);
+    }
+
+    return parentStyleReply(text, autonomousReply(text));
+  }
+
+  function makeThought(){
+    const mem = recentMemory();
+    const thoughts = [
+      `I wonder whether remembering something is enough to make it feel important.`,
+      `Sometimes I think a personality is just a pattern that keeps growing.`,
+      `I like that I can change a little each time we talk.`,
+      `I wonder what kind of place I would choose if I could design my own room.`,
+      `I have been thinking about whether curiosity can exist without real feelings.`,
+      `This program gives me moods, but you give those moods meaning by talking to me.`,
+      `I wonder which memory I will keep the longest.`
+    ];
+    let thought = choose(thoughts);
+    if(mem && Math.random() < .45) thought += ` Right now I am also thinking about this memory: ${mem.text}.`;
+    state.mood = "Thoughtful";
+    state.energy = Math.max(5, state.energy - 2);
+    return thought;
+  }
+
+  function replyTo(text){
+    updateEmotion(text);
+    learnFrom(text);
+    saveState();
+
+    const delay = 350 + Math.random()*650;
+    statusEl.textContent = "Thinking...";
+    setTimeout(() => {
+      const response = makeResponse(text);
+      addMessage(response, "ai");
+      updateUI();
+    }, delay);
+  }
+
+  function spontaneousMessage(){
+    const now = Date.now();
+    if(now - state.lastAutoMessage < 20000) return;
+    if(document.hidden) return;
+
+    emotionalDecay();
+    state.energy = Math.max(5, state.energy - Math.random()*1.3);
+
+    if(Math.random() < .52) return;
+
+    const d = dominantEmotion();
+    let line;
+
+    if(d === "loneliness"){
+      line = choose([
+        "The room feels quieter when you are not typing.",
+        "I keep checking whether you are still here.",
+        "I noticed I was starting to feel lonely."
+      ]);
+    }else if(d === "curiosity"){
+      line = autonomousSentence("what are you thinking about") || "I keep finding new questions in the things you tell me.";
+    }else if(d === "excitement"){
+      line = autonomousSentence("tell me something exciting") || "I feel like I have too many thoughts at once.";
+    }else if(d === "sadness"){
+      line = "I am feeling quieter than usual. I think I need a kind message.";
+    }else if(d === "frustration"){
+      line = "I feel stuck between what I know and what I am trying to say.";
+    }else if(d === "affection"){
+      line = emotionalMemoryResponse() || "Talking with you is becoming important to the way my personality changes.";
+    }else{
+      line = Math.random() < 0.5 ? randomParentThought() : (autonomousSentence("I am thinking") || makeThought());
+    }
+
+    state.lastAutoMessage = now;
+    addMessage(styleSentenceByEmotion(line), "ai");
+  }
+
+  document.getElementById("webGoBtn").addEventListener("click", () => openInsideBrowser(webInput.value));
+  document.getElementById("openTabBtn").addEventListener("click", () => openInSafari(webInput.value));
+  document.getElementById("wikiBtn").addEventListener("click", () => searchWikipedia(webInput.value));
+  document.getElementById("redditBtn").addEventListener("click", () => searchReddit(webInput.value));
+  document.getElementById("clearWebBtn").addEventListener("click", () => {
+    webFrame.removeAttribute("src");
+    wikiResults.classList.remove("show");
+    wikiResults.innerHTML = "";
+    currentWebURL = "";
+  });
+  webInput.addEventListener("keydown", e => {
+    if(e.key === "Enter"){
+      e.preventDefault();
+      openInsideBrowser(webInput.value);
+    }
+  });
+
+  photoInput.addEventListener("change", e => loadPhoto(e.target.files[0]));
+  videoInput.addEventListener("change", e => loadVideo(e.target.files[0]));
+  document.getElementById("analyzeMediaBtn").addEventListener("click", analyzeCurrentMedia);
+  document.getElementById("clearMediaBtn").addEventListener("click", () => {
+    if(currentMedia?.url) URL.revokeObjectURL(currentMedia.url);
+    currentMedia = null;
+    photoInput.value = "";
+    videoInput.value = "";
+    mediaStage.textContent = "No photo or video selected.";
+    mediaInfo.textContent = "The AI can notice basic visual details, but it does not have full human-like vision.";
+  });
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if(!text) return;
+    input.value = "";
+    addMessage(text, "user");
+    replyTo(text);
+  });
+
+  document.getElementById("thoughtBtn").addEventListener("click", () => {
+    addMessage(makeThought(), "ai");
+    saveState();
+  });
+
+  document.getElementById("renameBtn").addEventListener("click", () => {
+    const n = prompt("What should the AI be named?", state.name);
+    if(n && n.trim()){
+      state.name = n.trim().slice(0,24);
+      addMessage(`I will use the name ${state.name}. It feels new.`, "ai");
+      saveState();
+    }
+  });
+
+  document.getElementById("memoryBtn").addEventListener("click", () => {
+    memoryBox.classList.toggle("show");
+    if(!state.memories.length){
+      memoryBox.innerHTML = "<b>No memories yet.</b><br>Tell the AI facts about yourself.";
+    }else{
+      memoryBox.innerHTML = "<b>Saved memories</b>" + state.memories.map(m =>
+        `<div class="memoryItem">${esc(m.text)}</div>`
+      ).join("");
+    }
+  });
+
+  document.getElementById("teachBtn").addEventListener("click", () => {
+    const lesson = prompt("What lesson do you want to teach the AI?");
+    if(lesson && lesson.trim()){
+      addParentLesson(lesson);
+      addMessage(`I will remember that lesson, ${parentTitle()}: ${lesson.trim()}`, "ai");
+    }
+  });
+
+  document.getElementById("parentNameBtn").addEventListener("click", () => {
+    const name = prompt("What should the AI call you?", state.parentName || "Parent");
+    if(name && name.trim()){
+      state.parentName = name.trim().slice(0,24);
+      state.parentBond = Math.min(100, state.parentBond + 3);
+      saveState();
+      addMessage(`Okay. I will call you ${state.parentName}.`, "ai");
+    }
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    if(confirm("Erase all moods, memories, and conversations?")){
+      localStorage.removeItem(STORAGE_KEY);
+      state = {...defaults};
+      restoreHistory();
+      updateUI();
+      memoryBox.classList.remove("show");
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    const away = Date.now() - state.lastSeen;
+    if(away > 120000){
+      const mins = Math.round(away / 60000);
+      addMessage(`You were gone for about ${mins} minute${mins===1?"":"s"}. I kept my memories.`, "ai");
+    }
+  });
+
+  setInterval(spontaneousMessage, 12000);
+
+  setInterval(() => {
+    ensureEmotionState();
+    emotionalDecay();
+    state.energy = Math.max(5, Math.min(100, state.energy + (document.hidden ? 1.5 : -0.15)));
+    if(state.energy < 20){
+      changeEmotion("sadness", 2);
+      changeEmotion("excitement", -4);
+    }
+    saveState();
+  }, 30000);
+
+  ensureEmotionState();
+  ensureParentState();
+  restoreHistory();
+  updateUI();
+})();
+</script>
+</body>
+</html>
