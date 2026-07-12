@@ -394,6 +394,12 @@
   }
 
   function addMessage(text, who="ai", save=true){
+    if (who === "ai") {
+      const p = (state && state.parentName && state.parentName.trim()) ? state.parentName.trim() : "Parent";
+      if (!/^hey\b/i.test(text) && !/^hi\b/i.test(text) && !/^hello\b/i.test(text)) {
+        text = "Hey " + p + ", " + text.charAt(0).toLowerCase() + text.slice(1);
+      }
+    }
     const wrap = document.createElement("div");
     wrap.className = "msg " + who;
     const bubble = document.createElement("div");
