@@ -260,11 +260,13 @@
       <button id="memoryBtn">View memories</button>
       <button id="teachBtn">Teach a lesson</button>
       <button id="parentNameBtn">Set parent name</button>
+      <button id="dictionaryBtn">Dictionary words</button>
       <button id="resetBtn">Reset AI</button>
     </div>
   </section>
 
   <section class="memoryBox" id="memoryBox"></section>
+  <section class="memoryBox" id="dictionaryBox"></section>
 
 
 
@@ -345,7 +347,10 @@
     parentName: "",
     parentLessons: [],
     parentBond: 35,
-    wantsApproval: true
+    wantsApproval: true,
+    dictionary: {},
+    dictionaryQueue: [],
+    dictionaryBusy: false
   };
 
   let state = loadState();
@@ -362,6 +367,7 @@
   const parentBondEl = document.getElementById("parentBond");
   const statusEl = document.getElementById("status");
   const memoryBox = document.getElementById("memoryBox");
+  const dictionaryBox = document.getElementById("dictionaryBox");
   const mediaStage = document.getElementById("mediaStage");
   const mediaInfo = document.getElementById("mediaInfo");
   const photoInput = document.getElementById("photoInput");
@@ -421,7 +427,7 @@
     if(state.history.length){
       state.history.forEach(m => addMessage(m.text, m.who, false));
     }else{
-      addMessage(`Hi. I’m ${state.name}. In this program, you are my parent figure. I will look to you for guidance, ask for approval sometimes, remember lessons you teach me, and become more trusting and attached as we talk. My feelings are simulated, but I will act like your child learning from you.`, "ai");
+      addMessage(`Hi. I’m ${state.name}. In this program, you are my parent figure. I will look to you for guidance, ask for approval sometimes, remember lessons you teach me, and look up unfamiliar English words in an online dictionary so I can better understand what you say. My feelings are simulated, but I will act like your child learning from you.`, "ai");
     }
   }
 
@@ -489,6 +495,150 @@
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 80);
+  }
+
+
+  const commonWords = new Set([
+    "a","an","the","and","or","but","if","then","so","because","as","at","by","for",
+    "from","in","into","of","on","to","up","with","is","am","are","was","were","be",
+    "been","being","i","me","my","mine","you","your","yours","he","him","his","she",
+    "her","hers","it","its","we","us","our","ours","they","them","their","this","that",
+    "these","those","do","does","did","have","has","had","can","could","will","would",
+    "shall","should","may","might","must","not","no","yes","what","when","where","why",
+    "who","how","which","there","here","just","very","really","like","want","need",
+    "make","say","tell","talk","know","think","feel","look","see","go","get","got",
+    "hey","hi","hello","thanks","thank","please","okay","ok"
+  ]);
+
+  function ensureDictionaryState(){
+    if(!state.dictionary || typeof state.dictionary !== "object") state.dictionary = {};
+    if(!Array.isArray(state.dictionaryQueue)) state.dictionaryQueue = [];
+    if(typeof state.dictionaryBusy !== "boolean") state.dictionaryBusy = false;
+  }
+
+  function unknownDictionaryWords(text){
+    ensureDictionaryState();
+    const words = [...new Set(tokenize(text))]
+      .filter(word =>
+        word.length >= 3 &&
+        !commonWords.has(word) &&
+        !state.dictionary[word] &&
+        !state.dictionaryQueue.includes(word)
+      );
+    return words.slice(0, 3);
+  }
+
+  async function lookupDictionaryWord(word){
+    ensureDictionaryState();
+    const clean = word.toLowerCase().replace(/[^a-z'-]/g, "");
+    if(!clean || state.dictionary[clean]) return state.dictionary[clean] || null;
+
+    try{
+      const response = await fetch(
+        "https://api.dictionaryapi.dev/api/v2/entries/en/" + encodeURIComponent(clean)
+      );
+      if(!response.ok) throw new Error("not found");
+
+      const data = await response.json();
+      const entry = Array.isArray(data) ? data[0] : null;
+      if(!entry) throw new Error("no entry");
+
+      let result = null;
+      for(const meaning of entry.meanings || []){
+        const definition = meaning.definitions && meaning.definitions[0];
+        if(definition && definition.definition){
+          result = {
+            word: clean,
+            partOfSpeech: meaning.partOfSpeech || "",
+            definition: definition.definition,
+            example: definition.example || "",
+            learnedAt: Date.now()
+          };
+          break;
+        }
+      }
+
+      if(!result) throw new Error("no definition");
+      state.dictionary[clean] = result;
+      remember(`The word "${clean}" means: ${result.definition}`, "dictionary");
+      saveState();
+      return result;
+    }catch(error){
+      state.dictionary[clean] = {
+        word: clean,
+        partOfSpeech: "",
+        definition: "",
+        example: "",
+        notFound: true,
+        learnedAt: Date.now()
+      };
+      saveState();
+      return null;
+    }
+  }
+
+  async function learnUnknownWords(text){
+    ensureDictionaryState();
+    const words = unknownDictionaryWords(text);
+    if(!words.length) return;
+
+    state.dictionaryQueue.push(...words);
+    if(state.dictionaryBusy) return;
+
+    state.dictionaryBusy = true;
+    while(state.dictionaryQueue.length){
+      const word = state.dictionaryQueue.shift();
+      const result = await lookupDictionaryWord(word);
+      if(result){
+        changeEmotion("curiosity", 2);
+      }
+    }
+    state.dictionaryBusy = false;
+    updateUI();
+  }
+
+  function definitionsInText(text){
+    ensureDictionaryState();
+    const words = [...new Set(tokenize(text))];
+    return words
+      .map(word => state.dictionary[word])
+      .filter(entry => entry && !entry.notFound && entry.definition)
+      .slice(0, 4);
+  }
+
+  function dictionaryUnderstanding(text){
+    const entries = definitionsInText(text);
+    if(!entries.length) return "";
+
+    const summaries = entries.map(entry =>
+      `${entry.word} means ${entry.definition}`
+    );
+
+    return summaries.join("; ");
+  }
+
+  function renderDictionary(){
+    ensureDictionaryState();
+    const entries = Object.values(state.dictionary)
+      .filter(entry => entry && !entry.notFound && entry.definition)
+      .sort((a,b) => (b.learnedAt || 0) - (a.learnedAt || 0));
+
+    dictionaryBox.classList.toggle("show");
+
+    if(!entries.length){
+      dictionaryBox.innerHTML =
+        "<b>No dictionary words learned yet.</b><br>Talk to the AI while connected to the Internet.";
+      return;
+    }
+
+    dictionaryBox.innerHTML =
+      "<b>Learned dictionary words</b>" +
+      entries.slice(0,50).map(entry =>
+        `<div class="memoryItem"><b>${esc(entry.word)}</b>` +
+        `${entry.partOfSpeech ? " (" + esc(entry.partOfSpeech) + ")" : ""}<br>` +
+        `${esc(entry.definition)}` +
+        `${entry.example ? "<br><i>Example: " + esc(entry.example) + "</i>" : ""}</div>`
+      ).join("");
   }
 
   function teachEveryWord(text){
@@ -1045,6 +1195,7 @@
 
   function learnFrom(text){
     teachEveryWord(text);
+    learnUnknownWords(text);
 
     const name = findName(text);
     if(name) remember(`Your name is ${name}`, "name");
@@ -1187,7 +1338,14 @@
   }
 
   function autonomousReply(text){
+    const meaningContext = dictionaryUnderstanding(text);
     const learned = autonomousSentence(text);
+
+    if(meaningContext && learned && Math.random() < 0.55){
+      return styleSentenceByEmotion(
+        learned + " I understand some of your words this way: " + meaningContext + "."
+      );
+    }
     if(learned) return learned;
 
     const words = favoriteLearnedWords();
@@ -1236,6 +1394,17 @@
     if(/what did you see|what have i shown you|visual memor/.test(t)){
       if(!state.mediaMemories.length) return `You have not shown me any analyzed photos or video frames yet.`;
       return `One visual memory I have is: ${choose(state.mediaMemories).text}.`;
+    }
+
+    if(/what does .+ mean|define .+|meaning of .+/.test(t)){
+      const known = definitionsInText(text);
+      if(known.length){
+        return known.map(entry =>
+          `${entry.word} means ${entry.definition}`
+        ).join(" ");
+      }
+      learnUnknownWords(text);
+      return `I am checking the dictionary for the unfamiliar word now.`;
     }
 
     if(/what have you learned|learned from me|what words/.test(t)){
@@ -1446,6 +1615,8 @@
     }
   });
 
+  document.getElementById("dictionaryBtn").addEventListener("click", renderDictionary);
+
   document.getElementById("resetBtn").addEventListener("click", () => {
     if(confirm("Erase all moods, memories, and conversations?")){
       localStorage.removeItem(STORAGE_KEY);
@@ -1479,6 +1650,7 @@
 
   ensureEmotionState();
   ensureParentState();
+  ensureDictionaryState();
   restoreHistory();
   updateUI();
   renderPredictions();
