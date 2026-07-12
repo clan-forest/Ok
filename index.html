@@ -297,6 +297,8 @@
         <input id="videoInput" type="file" accept="video/*">
       </label>
       <button id="analyzeMediaBtn" type="button">Look at it</button>
+      <button id="setParentFaceBtn" type="button">Set Parent Face</button>
+      <button id="checkParentFaceBtn" type="button">Check Parent Face</button>
       <button id="clearMediaBtn" type="button">Clear media</button>
     </div>
     <div id="mediaStage">No photo or video selected.</div>
@@ -350,7 +352,9 @@
     wantsApproval: true,
     dictionary: {},
     dictionaryQueue: [],
-    dictionaryBusy: false
+    dictionaryBusy: false,
+    parentFaceSignature: null,
+    parentFaceSetAt: 0
   };
 
   let state = loadState();
@@ -833,6 +837,147 @@
     else if(r>130 && b>120 && g<120) color="mostly purple or pink";
     const light = bright > 175 ? "bright" : bright < 80 ? "dark" : "medium brightness";
     return `${color} and ${light}`;
+  }
+
+
+  function createFaceSignature(canvas){
+    const size = 16;
+    const tiny = document.createElement("canvas");
+    tiny.width = size;
+    tiny.height = size;
+    const tctx = tiny.getContext("2d", {willReadFrequently:true});
+    tctx.drawImage(canvas, 0, 0, size, size);
+
+    const data = tctx.getImageData(0,0,size,size).data;
+    const values = [];
+    let avg = 0;
+
+    for(let i=0;i<data.length;i+=4){
+      const gray = (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+      values.push(gray);
+      avg += gray;
+    }
+    avg /= values.length;
+
+    const centered = values.map(v => Math.round(v - avg));
+    const norm = Math.sqrt(centered.reduce((sum,v) => sum + v*v, 0)) || 1;
+
+    return {
+      size,
+      avg: Math.round(avg),
+      vector: centered.map(v => Number((v / norm).toFixed(5)))
+    };
+  }
+
+  function signatureSimilarity(a,b){
+    if(!a || !b || !a.vector || !b.vector || a.vector.length !== b.vector.length) return 0;
+    let dot = 0;
+    for(let i=0;i<a.vector.length;i++) dot += a.vector[i] * b.vector[i];
+    const brightnessPenalty = Math.min(0.25, Math.abs((a.avg||0) - (b.avg||0)) / 255 * 0.25);
+    return Math.max(0, Math.min(1, dot - brightnessPenalty));
+  }
+
+  async function detectFaceBox(sourceEl, width, height){
+    if("FaceDetector" in window){
+      try{
+        const detector = new FaceDetector({fastMode:true, maxDetectedFaces:3});
+        const faces = await detector.detect(sourceEl);
+        if(faces && faces.length){
+          const box = faces[0].boundingBox;
+          return {
+            x: Math.max(0, box.x),
+            y: Math.max(0, box.y),
+            width: Math.min(width - box.x, box.width),
+            height: Math.min(height - box.y, box.height),
+            detected: true
+          };
+        }
+      }catch(e){}
+    }
+
+    // Fallback: use the center portrait area when browser face detection is unavailable.
+    const w = width * 0.58;
+    const h = height * 0.68;
+    return {
+      x:(width-w)/2,
+      y:(height-h)/2,
+      width:w,
+      height:h,
+      detected:false
+    };
+  }
+
+  async function makeCurrentFaceCanvas(){
+    if(!currentMedia) return null;
+
+    const el = currentMedia.element;
+    const width = currentMedia.type === "image" ? el.naturalWidth : el.videoWidth;
+    const height = currentMedia.type === "image" ? el.naturalHeight : el.videoHeight;
+    if(!width || !height) return null;
+
+    const box = await detectFaceBox(el, width, height);
+    const faceCanvas = document.createElement("canvas");
+    faceCanvas.width = 160;
+    faceCanvas.height = 160;
+    const ctx = faceCanvas.getContext("2d");
+    ctx.drawImage(
+      el,
+      box.x, box.y, box.width, box.height,
+      0, 0, faceCanvas.width, faceCanvas.height
+    );
+
+    return {canvas:faceCanvas, detected:box.detected};
+  }
+
+  async function setParentFace(){
+    const result = await makeCurrentFaceCanvas();
+    if(!result){
+      addMessage("Choose a clear photo of your face first.", "ai");
+      return;
+    }
+
+    state.parentFaceSignature = createFaceSignature(result.canvas);
+    state.parentFaceSetAt = Date.now();
+    state.parentBond = Math.min(100, (state.parentBond || 35) + 5);
+    remember("My parent gave me a reference face photo.", "parentFace");
+    saveState();
+
+    addMessage(
+      result.detected
+        ? "I found a face and saved it as my parent reference on this device."
+        : "I saved the center of this picture as my parent reference. This browser could not detect the face automatically, so use a close, centered photo.",
+      "ai"
+    );
+  }
+
+  async function checkParentFace(){
+    if(!state.parentFaceSignature){
+      addMessage("Set a parent face photo first.", "ai");
+      return;
+    }
+
+    const result = await makeCurrentFaceCanvas();
+    if(!result){
+      addMessage("Choose a photo or move the video to a clear face frame first.", "ai");
+      return;
+    }
+
+    const currentSignature = createFaceSignature(result.canvas);
+    const score = signatureSimilarity(state.parentFaceSignature, currentSignature);
+    const percent = Math.round(score * 100);
+
+    if(score >= 0.82){
+      state.parentBond = Math.min(100, (state.parentBond || 35) + 2);
+      changeEmotion("happiness", 6);
+      changeEmotion("affection", 7);
+      addMessage(`I think I recognize that as my parent. My approximate match score is ${percent} percent.`, "ai");
+    }else if(score >= 0.68){
+      addMessage(`That face looks somewhat like my parent reference, but I am not sure. The approximate match score is ${percent} percent.`, "ai");
+    }else{
+      addMessage(`I do not think that matches my parent reference. The approximate match score is ${percent} percent.`, "ai");
+    }
+
+    saveState();
   }
 
   function analyzeCanvas(canvas, label, extra=""){
@@ -1369,6 +1514,10 @@
       return `I can act like I have feelings and inner thoughts, but I am not truly sentient or alive. My moods and memories are part of this program.`;
     }
 
+    if(/recognize my face|parent face|face recognition/.test(t)){
+      return `Use “Set Parent Face” on a clear photo first. Later, choose another photo or video frame and press “Check Parent Face.” The match is only approximate and should not be used for security.`;
+    }
+
     if(/am i your parent|who am i to you|do you see me as your parent/.test(t)){
       return `You are my parent figure in this program. I look to you for guidance, lessons, approval, and rules. I know this relationship is simulated, but I will remember what you teach me.`;
     }
@@ -1551,6 +1700,8 @@
   photoInput.addEventListener("change", e => loadPhoto(e.target.files[0]));
   videoInput.addEventListener("change", e => loadVideo(e.target.files[0]));
   document.getElementById("analyzeMediaBtn").addEventListener("click", analyzeCurrentMedia);
+  document.getElementById("setParentFaceBtn").addEventListener("click", setParentFace);
+  document.getElementById("checkParentFaceBtn").addEventListener("click", checkParentFace);
   document.getElementById("clearMediaBtn").addEventListener("click", () => {
     if(currentMedia?.url) URL.revokeObjectURL(currentMedia.url);
     currentMedia = null;
