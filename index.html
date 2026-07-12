@@ -213,6 +213,26 @@
   #wikiResults a{color:var(--accent)}
   .browserNote{font-size:12px;color:var(--muted);margin-top:8px}
 
+
+  .predictor{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-top:8px;
+  }
+  .predictor button{
+    padding:7px 10px;
+    border-radius:999px;
+    font-size:13px;
+    background:rgba(125,211,252,.12);
+    border:1px solid rgba(125,211,252,.28);
+  }
+  .predictorLabel{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:8px;
+  }
+
 </style>
 </head>
 <body>
@@ -287,6 +307,8 @@
     <input id="input" autocomplete="off" placeholder="Talk to Nova..." maxlength="300">
     <button id="send" type="submit">Send</button>
   </form>
+  <div class="predictorLabel">Predicted next words</div>
+  <div class="predictor" id="predictor"></div>
 </div>
 
 <script>
@@ -330,6 +352,7 @@
 
   const chat = document.getElementById("chat");
   const input = document.getElementById("input");
+  const predictor = document.getElementById("predictor");
   const form = document.getElementById("form");
   const aiName = document.getElementById("aiName");
   const moodEl = document.getElementById("mood");
@@ -490,6 +513,7 @@
     };
     state.messagePatterns.push(pattern);
     state.messagePatterns = state.messagePatterns.slice(-120);
+    renderPredictions();
   }
 
   function weightedChoiceFromObject(obj){
@@ -1034,6 +1058,58 @@
   }
 
 
+
+  function topNextWords(text, limit=5){
+    const words = tokenize(text);
+    if(!words.length){
+      return Object.entries(state.wordCounts || {})
+        .sort((a,b) => b[1] - a[1])
+        .slice(0,limit)
+        .map(([word,count]) => ({word,count}));
+    }
+
+    const last = words[words.length - 1];
+    const options = Object.entries((state.associations || {})[last] || {});
+    if(options.length){
+      return options
+        .sort((a,b) => b[1] - a[1])
+        .slice(0,limit)
+        .map(([word,count]) => ({word,count}));
+    }
+
+    return Object.entries(state.wordCounts || {})
+      .sort((a,b) => b[1] - a[1])
+      .slice(0,limit)
+      .map(([word,count]) => ({word,count}));
+  }
+
+  function renderPredictions(){
+    const suggestions = topNextWords(input.value, 5);
+    predictor.innerHTML = "";
+
+    if(!suggestions.length){
+      const note = document.createElement("span");
+      note.className = "small";
+      note.textContent = "Talk to the AI more so it can learn predictions.";
+      predictor.appendChild(note);
+      return;
+    }
+
+    suggestions.forEach(({word,count}) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = word;
+      btn.title = `Seen after this word ${count} time${count === 1 ? "" : "s"}`;
+      btn.addEventListener("click", () => {
+        const needsSpace = input.value.length && !/\s$/.test(input.value);
+        input.value += (needsSpace ? " " : "") + word + " ";
+        input.focus();
+        renderPredictions();
+      });
+      predictor.appendChild(btn);
+    });
+  }
+
   function pickStartWord(seedText){
     const seedWords = tokenize(seedText);
     for(let i = seedWords.length - 1; i >= 0; i--){
@@ -1309,11 +1385,14 @@
     mediaInfo.textContent = "The AI can notice basic visual details, but it does not have full human-like vision.";
   });
 
+  input.addEventListener("input", renderPredictions);
+
   form.addEventListener("submit", e => {
     e.preventDefault();
     const text = input.value.trim();
     if(!text) return;
     input.value = "";
+    renderPredictions();
     addMessage(text, "user");
     replyTo(text);
   });
@@ -1396,6 +1475,7 @@
   ensureParentState();
   restoreHistory();
   updateUI();
+  renderPredictions();
 })();
 </script>
 </body>
